@@ -23,7 +23,7 @@ TrixiBottomTopographyMakieExt = "Makie"
 
 [compat]
 CSV = "0.10.15"
-CairoMakie = "0.12.18"
+CairoMakie = "0.12.18, 0.13"
 DataFrames = "1.7.0"
 Downloads = "1.6"
 GMT = "1.29.0"
