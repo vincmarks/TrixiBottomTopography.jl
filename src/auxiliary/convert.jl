@@ -202,19 +202,33 @@ function convert_dgm_2d(path_read::String, path_write::String; excerpt = 1)
     close(write_file)
 end
 
-# Converting GeophysicalModelGenerator data into readable files (1D) 
+# Converting GeophysicalModelGenerator data into readable files (1D)
 """
     convert_geo_1d(path_read::String, path_write::String; nx::Int, ny::Int,
-                  excerpt = 1, direction = "x", section = 1)
-Function to convert GeophysicalModelGenerator data files into one dimensional readable files.
+                   excerpt = 1, direction = "x", section = 1)
+
+Function to convert `xyz` data created with
+[GeophysicalModelGenerator.jl](https://github.com/JuliaGeodynamics/GeophysicalModelGenerator.jl),
+e.g. by [`create_topography_data`](@ref), into one dimensional readable files.
+
+In contrast to [`convert_dgm_1d`](@ref), the grid dimensions cannot be deduced from the file
+itself, which is why `nx` and `ny` are required. This also allows rectangular grids where
+`nx != ny`.
+
 Inputs:
 - `path_read`: String of the path of the data which should be converted
-- `path_write`: String of the path where the new file should be saved
-- `nx`: Required keyword argument with the number of unique x values in the grid
-- `ny`: Required keyword argument with the number of unique y values in the grid
-- `excerpt`: Optional integer that specifies a stride through the data.
-- `direction`: Optional String that specifies if data should be read from "x" or "y" direction. Default is "x".
-- `section`: Optional integer which specifies which section of the other dimension should be chosen.
+- `path_write`: String of the path where the new file should be saved.
+              (Needs to also include the name of the file)
+- `nx`: Required keyword argument with the number of unique `x` values in the grid
+- `ny`: Required keyword argument with the number of unique `y` values in the grid
+- `excerpt`: Optional integer that specifies a stride through of the data that will be extracted. E.g.
+           if excerpt is set to 10, only every 10th `x` and `y` value are considered with their
+           corresponding `z` values. The default value is 1 which means that every value is taken.
+- `direction`: Optional String that specifies if the one dimensional data should be read from the
+             `x` or `y` direction. By default this is set to the `x` direction.
+- `section`: Optional integer which specifies which section of the other dimension should be
+           chosen. It must be between 1 and `ny` if `direction` is `x` and between 1 and `nx`
+           if `direction` is `y`. By default this value is set to 1.
 """
 function convert_geo_1d(path_read::String,
                         path_write::String;
@@ -293,11 +307,11 @@ function convert_geo_1d(path_read::String,
 
         # Save only the relevant data - adjust for rectangular grid
         # Get unique y values from the first column
-        y_uniq = y_all[1:(excerpt * nx):length_data]
+        x_uniq = y_all[1:(excerpt * nx):length_data]
 
         # For the z values, reshape to nx×ny grid and select appropriate section
         z_matrix = reshape(z_all, (nx, ny))
-        x_uniq = z_matrix[section, 1:excerpt:ny]
+        y_uniq = z_matrix[section, 1:excerpt:ny]
     end
 
     # Write the data to the file
@@ -321,13 +335,24 @@ end
 # Converting GeophysicalModelGenerator data into readable files (2D)
 """
     convert_geo_2d(path_read::String, path_write::String; nx::Int, ny::Int, excerpt = 1)
-Function to convert GeophysicalModelGenerator data files into two dimensional readable files.
+
+Function to convert `xyz` data created with
+[GeophysicalModelGenerator.jl](https://github.com/JuliaGeodynamics/GeophysicalModelGenerator.jl),
+e.g. by [`create_topography_data`](@ref), into two dimensional readable files.
+
+In contrast to [`convert_dgm_2d`](@ref), the grid dimensions cannot be deduced from the file
+itself, which is why `nx` and `ny` are required. This also allows rectangular grids where
+`nx != ny`.
+
 Inputs:
 - `path_read`: String of the path of the data which should be converted
-- `path_write`: String of the path where the new file should be saved
-- `nx`: Required keyword argument with the number of unique x values in the grid
-- `ny`: Required keyword argument with the number of unique y values in the grid
-- `excerpt`: Optional integer that specifies a stride through the data. Default is 1.
+- `path_write`: String of the path where the new file should be saved.
+              (Needs to also include the name of the file)
+- `nx`: Required keyword argument with the number of unique `x` values in the grid
+- `ny`: Required keyword argument with the number of unique `y` values in the grid
+- `excerpt`: Optional integer that specifies a stride through of the data that will be extracted. E.g.
+           if excerpt is set to 10, only every 10th `x` and `y` value are considered with their
+           corresponding `z` values. The default value is 1 which means that every value is taken.
 """
 function convert_geo_2d(path_read::String,
                         path_write::String;

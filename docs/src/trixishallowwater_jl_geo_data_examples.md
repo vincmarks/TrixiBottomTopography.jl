@@ -1,317 +1,340 @@
-# Examples with real topography data from GeophysicalModelGenerator.jl
+# Cliffs of Moher
 
-This section demonstrates how to use the topography data created with [GeophysicalModelGenerator.jl](https://github.com/JuliaGeodynamics/GeophysicalModelGenerator.jl) functions (`geo_topo_impression` and `create_topography_data`) in combination with [TrixiShallowWater.jl](https://github.com/trixi-framework/TrixiShallowWater.jl) to simulate shallow water flow over real-world topography.
+The [Rhine river](https://trixi-framework.github.io/TrixiBottomTopography.jl/stable/trixishallowwater_jl_examples/)
+examples use bottom topography that is already available in the TrixiBottomTopography.jl
+format. This section shows two examples that instead use topography obtained for an
+arbitrary region of the world with
+[GeophysicalModelGenerator.jl](https://github.com/JuliaGeodynamics/GeophysicalModelGenerator.jl),
+as described in [Real topography data](@ref).
 
-The workflow follows these steps:
-1. Load the converted topography data files (as shown in [docs/src/create_convert_geo_data.md](https://trixi-framework.github.io/TrixiBottomTopography.jl/stable/create_convert_geo_data/)).
-2. Create B-spline interpolations of the topography.
-3. Set up and run shallow water simulations.
-4. Visualize the results.
+The region is the coastline at the Cliffs of Moher in Ireland. The domain covers the open
+sea in the west and the cliffs, which rise up to roughly 197 m above sea level, in the east.
+In both examples a wave travels east and runs up the cliff face, which requires the
+wetting and drying capabilities of
+[TrixiShallowWater.jl](https://github.com/trixi-framework/TrixiShallowWater.jl).
 
-The example files used in this section can be found here:
--  1D example:  [examples/trixishallowwater_damn_break_1D_geo_data.jl](https://github.com/trixi-framework/TrixiBottomTopography.jl/blob/main/examples/trixishallowwater_damn_break_1D_geo_data.jl)
-- 2D example:  [examples/trixishallowwater_damn_break_2D_geo_data.jl](https://github.com/trixi-framework/TrixiBottomTopography.jl/blob/main/examples/trixishallowwater_damn_break_2D_geo_data.jl) 
+## One dimensional wave run-up
 
-## One dimensional dam break with real topography
+The underlying example file can be found [here](https://github.com/trixi-framework/TrixiBottomTopography.jl/blob/main/examples/trixishallowwater_cliffs_1D.jl).
 
-This example demonstrates a 1D dam break simulation using real Rhine river topography data processed through the [GeophysicalModelGenerator.jl](https://github.com/JuliaGeodynamics/GeophysicalModelGenerator.jl).
-
-### Setup and data loading
-
-First, we include the necessary packages and load the topography data:
+First, all the necessary packages must be included at the beginning of the file.
 
 ```@example geo_trixi_1D
 # Include packages
 using TrixiBottomTopography
-using OrdinaryDiffEqLowStorageRK
+using CairoMakie
+using OrdinaryDiffEqSSPRK
 using Trixi
 using TrixiShallowWater
-using CairoMakie
-using GeophysicalModelGenerator
-using GMT
-data_dir = joinpath(@__DIR__, "examples/data")
-mkpath(data_dir)
-data_file = joinpath(data_dir, "rhine_data_1d_20_x_geo.txt")
-data = data_file
 ```
 
-### B-spline interpolation
+In contrast to the Rhine examples,
+[OrdinaryDiffEqSSPRK.jl](https://docs.sciml.ai/OrdinaryDiffEq/stable/explicit/SSPRK/)
+is used here because the strong stability preserving methods it provides accept the
+positivity limiter that keeps the water height non-negative in dry regions.
 
-The topography data is interpolated using cubic B-splines to create a smooth bottom function:
+The one dimensional cut through the topography is shipped with the repository, so it can be
+loaded directly.
 
 ```@example geo_trixi_1D
-# Define B-spline structure
-spline_struct = CubicBSpline(data; end_condition = "not-a-knot", smoothing_factor = 999)
-spline_func(x) = spline_interpolation(spline_struct, x)
+root_dir = pkgdir(TrixiBottomTopography)
+cliffs_data = joinpath(root_dir, "examples", "data", "cliffs_data_1d_10_x.txt")
+nothing #hide
 ```
 
-### Visualization of the topography
-
-Before running the simulation, we can visualize the interpolated topography:
+The data is used to define the B-spline interpolation function as described in
+[B-spline structure](https://trixi-framework.github.io/TrixiBottomTopography.jl/dev/structure/)
+and [B-spline function](https://trixi-framework.github.io/TrixiBottomTopography.jl/dev/function/).
+No smoothing is applied here because it would flatten the steep cliff face by several meters.
 
 ```@example geo_trixi_1D
-# Define interpolation points
-n = 100
-x_int_pts = Vector(LinRange(spline_struct.x[1], spline_struct.x[end], n))
-# Get interpolated values
-y_int_pts = spline_func.(x_int_pts)
-# Plot the topography
-plot_topography(x_int_pts, y_int_pts; xlabel = "x[m]", ylabel = "z[m]")
+const spline_struct = CubicBSpline(cliffs_data; end_condition = "not-a-knot")
+spline_func(x::Float64) = spline_interpolation(spline_struct, x)
 ```
 
-### Shallow water equations setup
-
-We define the 1D shallow water equations with appropriate physical parameters:
+Plotting the interpolated topography shows the deep water in the west, the flat shelf that
+the SRTM data reports as zero, and the cliff face in the east.
 
 ```@example geo_trixi_1D
-equations = ShallowWaterEquations1D(gravity = 1.0, H0 = 55.0)
+x_int_pts = Vector(LinRange(spline_struct.x[1], spline_struct.x[end], 500))
+plot_topography(x_int_pts, spline_func.(x_int_pts); xlabel = "x [m]", ylabel = "z [m]")
 ```
 
-### Initial condition for dam break
-
-The initial condition creates a dam break scenario where water is initially higher in a central region:
+The topography is given with respect to sea level. A positive background total water height
+$H_0$ therefore floods the shallow shelf in front of the cliffs while the cliff face itself
+stays dry.
 
 ```@example geo_trixi_1D
-# Defining initial condition for the dam break problem
-function initial_condition_dam_break(x, t, equations::ShallowWaterEquations1D)
-    inicenter = SVector(0.0)
-    x_norm = x[1] - inicenter[1]
-    r = abs(x_norm)
-    # Calculate primitive variables
-    H = r < 50 ? 70.0 : 60.0  # Higher water in center region
-    v = 0.0                   # Initial velocity is zero
-    b = spline_func(x[1])     # Bottom topography from B-spline
+equations = ShallowWaterEquations1D(gravity = 9.81, H0 = 10.0)
+```
+
+At time $t=0$ the water surface west of $x = -350$ is raised to $20.0$ while the rest of the
+domain stays at the background water height $10.0$. This step collapses and sends a wave
+towards the cliffs. Because part of the domain is dry, the water surface has to be shifted
+by the `threshold_limiter` of the equations to keep the water height `h` strictly positive.
+
+```@example geo_trixi_1D
+# Defining initial condition of a wave which travels towards the cliffs
+function initial_condition_wave(x, t, equations::ShallowWaterEquations1D)
+    H = x[1] < -350.0 ? 20.0 : equations.H0
+    v = 0.0
+    b = spline_func(x[1])
+
+    H = max(H, b + equations.threshold_limiter)
+
     return prim2cons(SVector(H, v, b), equations)
 end
+
 # Setting initial condition
-initial_condition = initial_condition_dam_break
-# Setting the boundary to be a reflective wall
+initial_condition = initial_condition_wave
+
+# Setting the boundary to be a free-slip wall
 boundary_condition = boundary_condition_slip_wall
+nothing #hide
 ```
 
-### Numerical solver setup
-
-Get the DG approximation in space:
+The upcoming code parts will **not** be covered in full detail. For more information, see
+the documentation of [Trixi.jl](https://trixi-framework.github.io/TrixiDocumentation/stable/)
+and [TrixiShallowWater.jl](https://trixi-framework.github.io/TrixiShallowWater.jl/stable/).
+The essential difference to the Rhine examples is the discretization: wetting and drying
+requires the hydrostatic reconstruction of Chen and Noelle together with a shock capturing
+volume integral.
 
 ```@example geo_trixi_1D
-###############################################################################
-# Get the DG approximation space
 volume_flux = (flux_wintermeyer_etal, flux_nonconservative_wintermeyer_etal)
-solver = DGSEM(polydeg = 3, surface_flux = (flux_hll, flux_nonconservative_fjordholm_etal),
-               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
+surface_flux = (FluxHydrostaticReconstruction(flux_hll_chen_noelle,
+                                              hydrostatic_reconstruction_chen_noelle),
+                flux_nonconservative_chen_noelle)
+
+basis = LobattoLegendreBasis(3)
+
+indicator_sc = IndicatorHennemannGassnerShallowWater(equations, basis,
+                                                    alpha_max = 0.5,
+                                                    alpha_min = 0.001,
+                                                    alpha_smooth = true,
+                                                    variable = waterheight_pressure)
+volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
+                                                 volume_flux_dg = volume_flux,
+                                                 volume_flux_fv = surface_flux)
+
+solver = DGSEM(basis, surface_flux, volume_integral)
+nothing #hide
 ```
 
-### Mesh and semidiscretization
-
-Here we use a TreeMesh:
+The mesh spans exactly the interval covered by the topography data.
 
 ```@example geo_trixi_1D
-###############################################################################
-# Get the TreeMesh and setup a periodic mesh
 coordinates_min = spline_struct.x[1]
 coordinates_max = spline_struct.x[end]
 mesh = TreeMesh(coordinates_min, coordinates_max,
-                initial_refinement_level = 3,
-                n_cells_max = 10_000,
+                initial_refinement_level = 6,
                 periodicity = false)
-# create the semi discretization object
+
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_condition)
+nothing #hide
 ```
 
-### Time integration and solution
-
-Finally solving the PDE:
+The positivity limiter is handed to the time integration method as a stage limiter. It cuts
+off water heights below the `threshold_limiter` after every Runge-Kutta stage.
 
 ```@example geo_trixi_1D
-###############################################################################
-# ODE solvers
 tspan = (0.0, 100.0)
 ode = semidiscretize(semi, tspan)
-###############################################################################
-# run the simulation
+
+stage_limiter! = PositivityPreservingLimiterShallowWater(variables = (waterheight,))
+
 # define equidistant nodes in time for visualization of an animation
 visnodes = range(tspan[1], tspan[2], length = 90)
-# use a Runge-Kutta method with error-based time step size control
-sol = solve(ode, RDPK3SpFSAL49(), abstol = 1.0e-8, reltol = 1.0e-8,
+
+sol = solve(ode, SSPRK43(; stage_limiter!), abstol = 1.0e-6, reltol = 1.0e-6,
             saveat = visnodes)
+nothing #hide
 ```
 
-### Animation creation
-
-The solution is visualized as an animation showing the evolution of water height over the real topography:
+Finally, the solution is animated. The water surface reaches the cliff face after roughly
+50 s, runs up to about 21 m, and is then reflected back towards the open sea.
 
 ```@example geo_trixi_1D
-# Create animation of the solution
 j = Observable(1)
 time = Observable(0.0)
+
 pd_list = [PlotData1D(sol.u[i], semi) for i in 1:length(sol.t)]
 f = Figure()
 title_string = lift(t -> "time t = $(round(t, digits=3))", time)
-ax = Axis(f[1, 1], xlabel = "x[m]", ylabel = "z[m]", title = title_string)
+ax = Axis(f[1, 1], xlabel = "x [m]", ylabel = "z [m]", title = title_string)
+
 height = lift(i -> pd_list[i].data[:, 1], j)
 bottom = lift(i -> pd_list[i].data[:, 3], j)
-CairoMakie.lines!(ax, pd_list[1].x, height)
-CairoMakie.lines!(ax, pd_list[1].x, bottom)
-ylims!(ax, 30, 90)
-record(f, "animation_geo.gif", 1:length(pd_list)) do tt
+lines!(ax, pd_list[1].x, height)
+lines!(ax, pd_list[1].x, bottom)
+ylims!(ax, -40, 60)
+
+record(f, "animation_cliffs_1d.gif", 1:length(pd_list)) do tt
     j[] = tt
     time[] = sol.t[tt]
 end
+nothing #hide
 ```
 
-## Two dimensional dam break with real topography
+![simCliffs1D](animation_cliffs_1d.gif)
 
-This example extends the simulation to 2D, using the real Rhine river topography data processed through [GeophysicalModelGenerator.jl](https://github.com/JuliaGeodynamics/GeophysicalModelGenerator.jl).
+## Two dimensional wave run-up
 
-### Setup and data loading
+The underlying example file can be found [here](https://github.com/trixi-framework/TrixiBottomTopography.jl/blob/main/examples/trixishallowwater_cliffs_2D.jl).
+
+The two dimensional example uses the same scenario on the full topography. Since the
+solution is post-processed with
+[Trixi2Vtk.jl](https://github.com/trixi-framework/Trixi2Vtk.jl) instead of Makie.jl, that
+package is loaded as well.
 
 ```@example geo_trixi_2D
 # Include packages
 using TrixiBottomTopography
-using OrdinaryDiffEqLowStorageRK
-using Trixi
-using TrixiShallowWater
 using CairoMakie
+using OrdinaryDiffEqSSPRK
+using Trixi
 using Trixi2Vtk
-using GeophysicalModelGenerator
-using GMT
-data_dir = joinpath(@__DIR__, "examples/data")
-mkpath(data_dir)
-data_file = joinpath(data_dir, "rhine_data_2d_20_geo.txt")
-data = data_file
+using TrixiShallowWater
 ```
 
-### Bicubic B-spline interpolation
-
-For 2D topography, we use bicubic B-splines:
+The two dimensional data is interpolated with a bicubic B-spline.
 
 ```@example geo_trixi_2D
-# B-spline interpolation of the underlying data
-spline_struct = BicubicBSpline(data; end_condition = "not-a-knot", smoothing_factor = 999)
-# Define B-spline interpolation function
-spline_func(x, y) = spline_interpolation(spline_struct, x, y)
+root_dir = pkgdir(TrixiBottomTopography)
+cliffs_data = joinpath(root_dir, "examples", "data", "cliffs_data_2d_10.txt")
+
+const spline_struct = BicubicBSpline(cliffs_data; end_condition = "not-a-knot")
+spline_func(x::Float64, y::Float64) = spline_interpolation(spline_struct, x, y)
 ```
 
-### Visualization of 2D topography
+Sampling the interpolation function on a finer set of nodes gives a three dimensional view
+of the coastline. Note that `Makie.surface` expects the values as `z[x_index, y_index]`
+whereas `evaluate_two_dimensional_interpolant` returns them as `z[y_index, x_index]`.
 
 ```@example geo_trixi_2D
-# Define interpolation points
-n = 100
+n = 200
 x_int_pts = Vector(LinRange(spline_struct.x[1], spline_struct.x[end], n))
 y_int_pts = Vector(LinRange(spline_struct.y[1], spline_struct.y[end], n))
-# Get interpolated matrix
-z_int_pts = evaluate_bicubicspline_interpolant(spline_func, x_int_pts, y_int_pts)
-# Plot the topography
-plot_topography(x_int_pts, y_int_pts, z_int_pts;
-                xlabel = "x\n [m]",
-                ylabel = "y\n [m]",
-                zlabel = "z\n [m]",
-                azimuth_angle = 54 * pi / 180,
-                elevation_angle = 27 * pi / 180)
+
+z_int_pts = evaluate_two_dimensional_interpolant(spline_func, x_int_pts, y_int_pts)
+
+plot_topography(x_int_pts, y_int_pts, permutedims(z_int_pts);
+                xlabel = "x\n [m]", ylabel = "y\n [m]", zlabel = "z\n [m]",
+                azimuth_angle = -120 * pi / 180, elevation_angle = 20 * pi / 180)
 ```
 
-### 2D shallow water equations
+The equations and the initial condition are the direct two dimensional analogue of the one
+dimensional case above.
 
 ```@example geo_trixi_2D
-equations = ShallowWaterEquations2D(gravity = 9.81, H0 = 70.0)
+equations = ShallowWaterEquations2D(gravity = 9.81, H0 = 10.0)
+
 function initial_condition_wave(x, t, equations::ShallowWaterEquations2D)
-    inicenter = SVector(-10.0, -20.0) # center of the domain
-    x_norm = x - inicenter
-    r = sqrt(x_norm[1]^2 + x_norm[2]^2)
-    # Calculate primitive variables
-    H = r < 50 ? 80.0 : 70.0 # Higher water in center region
-    v1 = 0.0                 # Initial x-velocity
-    v2 = 0.0                 # Initial y-velocity
-    x1, x2 = x
-    b = spline_func(x1, x2)  # Bottom topography from bicubic B-spline
+    H = x[1] < -350.0 ? 20.0 : equations.H0
+    v1 = 0.0
+    v2 = 0.0
+    b = spline_func(x[1], x[2])
+
+    H = max(H, b + equations.threshold_limiter)
+
     return prim2cons(SVector(H, v1, v2, b), equations)
 end
-# Setting initial condition
+
 initial_condition = initial_condition_wave
-# Setting boundary conditions for all sides
-boundary_condition = Dict(:x_neg => boundary_condition_slip_wall,
-                          :y_neg => boundary_condition_slip_wall,
-                          :y_pos => boundary_condition_slip_wall,
-                          :x_pos => boundary_condition_slip_wall)
+boundary_condition = boundary_condition_slip_wall
+nothing #hide
 ```
 
-### 2D solver and mesh setup
+The approximation space is set up in the same way as in the one dimensional case.
 
 ```@example geo_trixi_2D
-###############################################################################
-# Get the DG approximation space
 volume_flux = (flux_wintermeyer_etal, flux_nonconservative_wintermeyer_etal)
-solver = DGSEM(polydeg = 3,
-               surface_flux = (flux_fjordholm_etal, flux_nonconservative_fjordholm_etal),
-               volume_integral = VolumeIntegralFluxDifferencing(volume_flux))
-###############################################################################
-# create the mesh and semidiscretization
+surface_flux = (FluxHydrostaticReconstruction(flux_hll_chen_noelle,
+                                              hydrostatic_reconstruction_chen_noelle),
+                flux_nonconservative_chen_noelle)
+
+basis = LobattoLegendreBasis(3)
+
+indicator_sc = IndicatorHennemannGassnerShallowWater(equations, basis,
+                                                    alpha_max = 0.5,
+                                                    alpha_min = 0.001,
+                                                    alpha_smooth = true,
+                                                    variable = waterheight_pressure)
+volume_integral = VolumeIntegralShockCapturingHG(indicator_sc;
+                                                 volume_flux_dg = volume_flux,
+                                                 volume_flux_fv = surface_flux)
+
+solver = DGSEM(basis, surface_flux, volume_integral)
+nothing #hide
+```
+
+Here a [`P4estMesh`](https://trixi-framework.github.io/TrixiDocumentation/stable/meshes/p4est_mesh/)
+is used instead of a `TreeMesh` because it supports the non-conforming adaptive mesh
+refinement that resolves the moving wave front.
+
+```@example geo_trixi_2D
 coordinates_min = (spline_struct.x[1], spline_struct.y[1])
 coordinates_max = (spline_struct.x[end], spline_struct.y[end])
 mesh = P4estMesh((1, 1);
                  polydeg = 1,
                  coordinates_min = coordinates_min,
                  coordinates_max = coordinates_max,
-                 initial_refinement_level = 6,
+                 initial_refinement_level = 4,
                  periodicity = false)
+
 semi = SemidiscretizationHyperbolic(mesh, equations, initial_condition, solver,
                                     boundary_conditions = boundary_condition)
+
+tspan = (0.0, 60.0)
+ode = semidiscretize(semi, tspan)
+nothing #hide
 ```
 
-**Note on mesh choice**: For this 2D simulation, we use [`P4estMesh`](https://trixi-framework.github.io/TrixiDocumentation/stable/meshes/p4est_mesh/) instead of a [`TreeMesh`](https://trixi-framework.github.io/TrixiDocumentation/stable/meshes/tree_mesh/) (as used in the 1D case) because the [`TreeMesh`](https://trixi-framework.github.io/TrixiDocumentation/stable/meshes/tree_mesh/) requires cubic domains which we do not have here.
-
-
-### Solution with callbacks and output
-
-For the 2D case, we set up callbacks to save the solution for post-processing with ParaView:
+The solution is written to an output directory from which it is later converted to VTK
+files. The positivity limiter is passed both to the AMR callback, so that it is applied
+after every mesh adaptation, and to the time integration method.
 
 ```@example geo_trixi_2D
-tspan = (0.0, 100.0)
-ode = semidiscretize(semi, tspan)
-###############################################################################
-# Clear the output directory if it exists and create it new for saving the output
-output_dir = "examples/data/out"
-if isdir(output_dir)
-    rm(output_dir, recursive = true)
-end
-mkpath(output_dir)
-###############################################################################
-# Callbacks for the ODE solver
-stepsize_callback = StepsizeCallback(cfl = 0.6)
-save_solution = SaveSolutionCallback(interval = 2,
+output_dir = mktempdir()
+
+stage_limiter! = PositivityPreservingLimiterShallowWater(variables = (waterheight,))
+
+amr_indicator = IndicatorLöhner(semi, variable = first)
+amr_controller = ControllerThreeLevel(semi, amr_indicator,
+                                      base_level = 4,
+                                      med_level = 5, med_threshold = 0.1,
+                                      max_level = 6, max_threshold = 0.5)
+amr_callback = AMRCallback(semi, amr_controller,
+                           interval = 1,
+                           adapt_initial_condition = true,
+                           adapt_initial_condition_only_refine = true,
+                           limiter! = stage_limiter!)
+
+stepsize_callback = StepsizeCallback(cfl = 0.2)
+
+save_solution = SaveSolutionCallback(dt = 0.5,
                                      save_initial_solution = true,
                                      save_final_solution = true,
                                      output_directory = output_dir,
                                      solution_variables = cons2prim)
-callbacks = CallbackSet(stepsize_callback, save_solution)
-###############################################################################
-# Solve with positivity preserving limiter
-stage_limiter! = PositivityPreservingLimiterShallowWater(variables = (waterheight,))
-sol = solve(ode, RDPK3SpFSAL49(stage_limiter!), dt = 1.0, adaptive = false,
+
+callbacks = CallbackSet(amr_callback, stepsize_callback, save_solution)
+
+sol = solve(ode, SSPRK43(; stage_limiter!); dt = 1.0, adaptive = false,
             callback = callbacks)
+nothing #hide
 ```
 
-### Post-processing for ParaView
+Finally, the Trixi.jl output files are post-processed with Trixi2Vtk.jl.
 
-The 2D results are converted via [Trixi2Vtk](https://github.com/trixi-framework/Trixi2Vtk.jl) to VTK format for visualization in ParaView:
-
-```
-@example geo_trixi_2D
-# Save mesh and convert to VTK format
-Trixi.save_mesh_file(mesh, output_dir)
+```@example geo_trixi_2D
 trixi2vtk(joinpath(output_dir, "solution_*.h5"), output_directory = output_dir)
+nothing #hide
 ```
 
-## Visualization in ParaView
-
-For 2D simulations, the generated VTK files can be opened in ParaView for advanced visualization:
-
-1. Open the `solution_00000.pvd` file in ParaView.
-2. Apply "Warp By Scalar" filter twice: once for water height, once for bathymetry.
-3. Customize colors, lighting, and camera angles.
-4. Create animations of the time evolution.
-
-Example videos of such simulations are available here:
-- [3D perspective view](https://jgumainz-my.sharepoint.com/:v:/g/personal/vimarks_uni-mainz_de/EVy3I6lXCXZFkbtQpdEbFX4BL-3bJ4-ueNPHsqYd__0pdA)
-- [Top-down view](https://jgumainz-my.sharepoint.com/:v:/g/personal/vimarks_uni-mainz_de/EQ9GSqVOilJKjmWUElKHq5UBylGwgLlPLY1oJsRx3r4s6Q)
+It is possible to open the created `solution_00000.pvd` file with
+[ParaView](https://www.paraview.org/) and create a video of the simulation. In ParaView,
+one can apply two instances of the *Warp By Scalar* filter to visualize the water height
+and the bathymetry in three dimensions. Many additional customizations, e.g., color
+scaling and fonts, are available there.

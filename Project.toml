@@ -19,18 +19,18 @@ Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 MathOptInterface = "b8f27783-ece8-5eb3-8dc8-9495eed66fee"
 
 [extensions]
+GeophysicalModelGeneratorExt = ["GeophysicalModelGenerator", "DataFrames", "GMT"]
 KernelInterpolationExt = "KernelInterpolation"
 MakieExt = "Makie"
 MathOptInterfaceHiGHSExt = ["HiGHS", "MathOptInterface"]
-GeophysicalModelGeneratorExt = ["GeophysicalModelGenerator", "DataFrames", "GMT"]
 
 [compat]
 DataFrames = "1.5"
 Downloads = "1.6"
-HiGHS = "1.0"
-KernelInterpolation = "0.3.5"
 GMT = "1.0"
 GeophysicalModelGenerator = "0.7.14"
+HiGHS = "1.0"
+KernelInterpolation = "0.3.5"
 LinearAlgebra = "1"
 Makie = "0.21, 0.22, 0.24"
 MathOptInterface = "1.0"
