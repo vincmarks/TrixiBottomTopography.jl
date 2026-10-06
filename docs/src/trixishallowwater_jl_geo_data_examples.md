@@ -75,6 +75,10 @@ function initial_condition_wave(x, t, equations::ShallowWaterEquations1D)
     b = spline_func(x[1])
 
     # Undisturbed water depth
+    # Note, it is mandatory to shift the water level at dry areas to ensure that the water height
+    # stays positive. The system would not be stable for `h` set to a hard `0` due to division in
+    # the computation of velocity, e.g., (h v) / h. The small dry state threshold has
+    # a default value of 500*eps() ≈ 1e-13 in double precision.
     h0 = max(equations.H0 - b, equations.threshold_limiter)
 
     # Smooth elevation of the water surface on top of it
@@ -94,7 +98,9 @@ boundary_condition = boundary_condition_slip_wall
 nothing #hide
 ```
 
-The upcoming code parts will **not** be covered in full detail. For more information, see
+The upcoming code components on creating the solver components, 
+mesh, time discretization, etc. will **not** be covered in full detail. 
+For more information, see
 the documentation of [Trixi.jl](https://trixi-framework.github.io/TrixiDocumentation/stable/)
 and [TrixiShallowWater.jl](https://trixi-framework.github.io/TrixiShallowWater.jl/stable/).
 
@@ -198,7 +204,7 @@ const spline_struct = BicubicBSpline(cliffs_data; end_condition = "not-a-knot")
 spline_func(x::Float64, y::Float64) = spline_interpolation(spline_struct, x, y)
 ```
 
-Let's create a three dimensional view of the coastline.
+Let's create a three dimensional visualization of the coastline.
 
 ```@example geo_trixi_2D
 n = 200
@@ -228,6 +234,10 @@ function initial_condition_wave(x, t, equations::ShallowWaterEquations2D)
     b = spline_func(x[1], x[2])
 
     # Undisturbed water depth
+    # Note, it is mandatory to shift the water level at dry areas to ensure that the water height
+    # stays positive. The system would not be stable for `h` set to a hard `0` due to division in
+    # the computation of velocity, e.g., (h v) / h. The small dry state threshold has
+    # a default value of 500*eps() ≈ 1e-13 in double precision.
     h0 = max(equations.H0 - b, equations.threshold_limiter)
 
     # Smooth elevation of the water surface on top of it

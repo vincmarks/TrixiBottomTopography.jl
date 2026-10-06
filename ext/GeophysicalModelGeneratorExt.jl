@@ -120,7 +120,7 @@ function create_topography_data(;
 
     Topo_Cart_orth = project_CartData(Topo_Cart_orth, Topo, p) # project the topography data on the Cartesian grid
 
-    # combine x, y, z into a DataFrame, warning: you have to scale the values to meters
+    # combine x, y, z into a DataFrame. Note: you have to scale the values to meters
     df_xyz = DataFrame(x = convert.(Float64, vec(Topo_Cart_orth.x.val[:, :, 1])) .* 1000,
                        y = convert.(Float64, vec(Topo_Cart_orth.y.val[:, :, 1])) .* 1000,
                        z = convert.(Float64, vec(Topo_Cart_orth.z.val[:, :, 1])) .* 1000)

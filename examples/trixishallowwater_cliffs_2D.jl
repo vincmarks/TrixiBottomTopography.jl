@@ -63,6 +63,10 @@ function initial_condition_wave(x, t, equations::ShallowWaterEquations2D)
     b = spline_func(x[1], x[2])
 
     # Undisturbed water depth
+    # Note, it is mandatory to shift the water level at dry areas to ensure that the water height
+    # stays positive. The system would not be stable for `h` set to a hard `0` due to division in
+    # the computation of velocity, e.g., (h v) / h. The small dry state threshold has
+    # a default value of 500*eps() ≈ 1e-13 in double precision.
     h0 = max(equations.H0 - b, equations.threshold_limiter)
 
     # Smooth elevation of the water surface on top of it

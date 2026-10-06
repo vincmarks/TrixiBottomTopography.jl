@@ -235,7 +235,7 @@ function convert_geo_1d(path_read::String,
                         ny::Int,
                         excerpt = 1,
                         direction = "x",
-                        section = 1,)
+                        section = 1)
 
     # Check if dimensions are valid
     if nx <= 0 || ny <= 0
@@ -356,7 +356,7 @@ function convert_geo_2d(path_read::String,
                         path_write::String;
                         nx::Int,
                         ny::Int,
-                        excerpt = 1,)
+                        excerpt = 1)
     # Check if dimensions are valid
     if nx <= 0 || ny <= 0
         throw(ArgumentError("Dimensions nx and ny must be positive integers"))

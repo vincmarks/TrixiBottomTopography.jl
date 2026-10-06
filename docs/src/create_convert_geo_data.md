@@ -1,4 +1,4 @@
-# Real topography data
+# Real topography data from GeophysicalModelGenerator.jl
 
 The [Data conversion](https://trixi-framework.github.io/TrixiBottomTopography.jl/stable/conversion/)
 section describes how to convert DGM data.
@@ -119,7 +119,7 @@ For more details about the coordinate projections used by these functions, see t
 
 ## Conversion functions
 
-The `xyz` file created above still has to be converted into the format required by
+The `xyz` file created above still must be converted into the format required by
 TrixiBottomTopography.jl, which is described in
 [Data conversion](https://trixi-framework.github.io/TrixiBottomTopography.jl/stable/conversion/).
 Two functions are provided for this purpose:
