@@ -9,7 +9,6 @@ import KernelInterpolation
 import MathOptInterface
 import HiGHS
 import GeophysicalModelGenerator
-import DataFrames
 import GMT
 
 # Copy list of authors to not need to synchronize it manually.

@@ -1,4 +1,4 @@
-# Real topography data from GeophysicalModelGenerator.jl
+# [Real topography data from GeophysicalModelGenerator.jl](@id real_topography_data)
 
 The [Data conversion](https://trixi-framework.github.io/TrixiBottomTopography.jl/stable/conversion/)
 section describes how to convert DGM data.
@@ -14,16 +14,14 @@ The underlying example file can be found [here](https://github.com/trixi-framewo
 
 The functions `geo_topo_impression` and `create_topography_data` live in a package
 extension, so they only become available once
-[GeophysicalModelGenerator.jl](https://github.com/JuliaGeodynamics/GeophysicalModelGenerator.jl),
-[GMT.jl](https://github.com/GenericMappingTools/GMT.jl) and
-[DataFrames.jl](https://github.com/JuliaData/DataFrames.jl) are loaded as well.
+[GeophysicalModelGenerator.jl](https://github.com/JuliaGeodynamics/GeophysicalModelGenerator.jl)
+and [GMT.jl](https://github.com/GenericMappingTools/GMT.jl) are loaded as well.
 
 ```@example geo_data
 # Include packages
 using TrixiBottomTopography
 using GeophysicalModelGenerator
 using GMT # needed for the functions `geo_topo_impression` and `create_topography_data`
-using DataFrames # needed for the function `create_topography_data`
 ```
 
 With these packages available, `geo_topo_impression` downloads the topography of a region
@@ -80,16 +78,16 @@ an `xyz` file.
 # build a temporary directory.
 data_dir = mktempdir()
 
-df_xyz, Topo_Cart_orth = create_topography_data(low_x = -0.55,
-                                                high_x = 0.55,
-                                                gridsize_x = 0.001,
-                                                low_y = -0.55,
-                                                high_y = 0.55,
-                                                gridsize_y = 0.001,
-                                                write_path = data_dir,
-                                                dataname = "cliffs.xyz",
-                                                Topo = Topo,
-                                                p = p)
+xyz, Topo_Cart_orth = create_topography_data(low_x = -0.55,
+                                             high_x = 0.55,
+                                             gridsize_x = 0.001,
+                                             low_y = -0.55,
+                                             high_y = 0.55,
+                                             gridsize_y = 0.001,
+                                             write_path = data_dir,
+                                             dataname = "cliffs.xyz",
+                                             Topo = Topo,
+                                             p = p)
 nothing #hide
 ```
 
@@ -105,7 +103,8 @@ This function requires you to specify:
 
 The function returns:
 
-- `df_xyz`: a `DataFrame` containing the projected coordinates and elevations.
+- `xyz`: a `NamedTuple` with the vectors `x`, `y` and `z` containing the projected
+  coordinates and elevations.
 - `Topo_Cart_orth`: a `CartData` object with the topography interpolated onto the regular
   grid points.
 

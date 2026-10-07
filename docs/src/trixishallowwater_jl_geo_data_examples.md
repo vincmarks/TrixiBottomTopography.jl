@@ -2,7 +2,7 @@
 
 This section shows two examples that use topography obtained with
 [GeophysicalModelGenerator.jl](https://github.com/JuliaGeodynamics/GeophysicalModelGenerator.jl),
-as described in [Real topography data](@ref).
+as described in [Real topography data](@ref real_topography_data).
 
 The region is a part of the coastline at the Cliffs of Moher in Ireland. The domain covers the open sea and the cliffs. In both examples a wave travels across
 the sea and finally runs up the cliffs.

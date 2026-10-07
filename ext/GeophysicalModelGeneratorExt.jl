@@ -1,7 +1,6 @@
 module GeophysicalModelGeneratorExt
 
 using GeophysicalModelGenerator
-using DataFrames
 using GMT
 using TrixiBottomTopography
 
@@ -94,12 +93,13 @@ which can afterwards be converted with [`convert_geo_1d`](@ref) or [`convert_geo
 - `p`: Projection point for the coordinate transformation (output from `geo_topo_impression`)
 
 # Returns
-- `df_xyz`: DataFrame containing the projected coordinates and elevations (in meters)
+- `xyz`: `NamedTuple` with the vectors `x`, `y` and `z` containing the projected coordinates
+  and elevations (in meters)
 - `Topo_Cart_orth`: CartData object containing the projected topography data
 
 # Notes
 - All distance inputs (`low_x`, `high_x`, etc.) are given in kilometers
-- The returned DataFrame and the written file contain coordinates in meters
+- The returned `xyz` and the written file contain coordinates in meters
 - The output file is space separated with the columns `x y z`
 """
 function create_topography_data(;
@@ -120,21 +120,19 @@ function create_topography_data(;
 
     Topo_Cart_orth = project_CartData(Topo_Cart_orth, Topo, p) # project the topography data on the Cartesian grid
 
-    # combine x, y, z into a DataFrame. Note: you have to scale the values to meters
-    df_xyz = DataFrame(x = convert.(Float64, vec(Topo_Cart_orth.x.val[:, :, 1])) .* 1000,
-                       y = convert.(Float64, vec(Topo_Cart_orth.y.val[:, :, 1])) .* 1000,
-                       z = convert.(Float64, vec(Topo_Cart_orth.z.val[:, :, 1])) .* 1000)
-
-    data_dir = write_path
+    # Extract x, y, z as vectors. Note: you have to scale the values to meters
+    x = convert.(Float64, vec(Topo_Cart_orth.x.val[:, :, 1])) .* 1000
+    y = convert.(Float64, vec(Topo_Cart_orth.y.val[:, :, 1])) .* 1000
+    z = convert.(Float64, vec(Topo_Cart_orth.z.val[:, :, 1])) .* 1000
 
     # Write the data to a file and save it in the specified directory with the specified name
-    output_file = joinpath(data_dir, dataname)
+    output_file = joinpath(write_path, dataname)
     open(output_file, "w") do file
-        for row in eachrow(df_xyz)
-            rounded_row = [round(value, digits = 5) for value in row]
-            println(file, join(rounded_row, " "))
+        for i in eachindex(x, y, z)
+            println(file, round(x[i], digits = 5), " ", round(y[i], digits = 5), " ",
+                    round(z[i], digits = 5))
         end
     end
-    return df_xyz, Topo_Cart_orth
+    return (; x, y, z), Topo_Cart_orth
 end
 end

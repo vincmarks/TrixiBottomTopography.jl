@@ -8,7 +8,6 @@
 using TrixiBottomTopography
 using GeophysicalModelGenerator
 using GMT # needed for the functions `geo_topo_impression` and `create_topography_data`
-using DataFrames # needed for the function `create_topography_data`
 
 # Define file paths
 root_dir = pkgdir(TrixiBottomTopography)
@@ -24,16 +23,16 @@ Topo, p, Topo_Cart = geo_topo_impression(resolution = "@earth_relief_01s",
 # Project the topography onto a regular Cartesian grid and write it to an `xyz` file.
 # The bounds `low_x`, `high_x`, `low_y` and `high_y` are given in kilometers and are
 # chosen based on the output of `Topo_Cart`.
-df_xyz, Topo_Cart_orth = create_topography_data(low_x = -0.55,
-                                                high_x = 0.55,
-                                                gridsize_x = 0.001,
-                                                low_y = -0.55,
-                                                high_y = 0.55,
-                                                gridsize_y = 0.001,
-                                                write_path = data_dir,
-                                                dataname = "cliffs.xyz",
-                                                Topo = Topo,
-                                                p = p)
+xyz, Topo_Cart_orth = create_topography_data(low_x = -0.55,
+                                             high_x = 0.55,
+                                             gridsize_x = 0.001,
+                                             low_y = -0.55,
+                                             high_y = 0.55,
+                                             gridsize_y = 0.001,
+                                             write_path = data_dir,
+                                             dataname = "cliffs.xyz",
+                                             Topo = Topo,
+                                             p = p)
 
 path_src_file = joinpath(data_dir, "cliffs.xyz")
 path_out_file_1d_x = joinpath(data_dir, "cliffs_data_1d_10_x.txt")
